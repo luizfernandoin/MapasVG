@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estados e Municípios do Brasil</title>
+    <style>
+        #map { width: 600px; height: 400px; }
+        #estado, #municipio { margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Selecione um Estado e Município</h1>
+
+    <label for="estado">Estado:</label>
+    <select id="estado">
+        <option value="">Selecione um estado</option>
+    </select>
+
+    <label for="municipio">Município:</label>
+    <select id="municipio">
+        <option value="">Selecione um município</option>
+    </select>
+
+    <div id="map">
+        <svg id="estado-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+
+    <script>
+        function carregarEstados() {
+            fetch('/api/estados')
+                .then(response => response.json())
+                .then(data => {
+                    let estadoSelect = document.getElementById('estado');
+                    data.forEach(estado => {
+                        let option = document.createElement('option');
+                        option.value = estado.id;
+                        option.textContent = estado.nome;
+                        estadoSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.log('Erro ao carregar estados:', error));
+        }
+
+        function carregarMunicipios(estadoId) {
+            fetch(`/api/estados/${estadoId}/municipios`)
+                .then(response => response.json())
+                .then(data => {
+                    let municipioSelect = document.getElementById('municipio');
+                    municipioSelect.innerHTML = '<option value="">Selecione um município</option>';
+                    data.forEach(municipio => {
+                        let option = document.createElement('option');
+                        option.value = municipio.id;
+                        option.textContent = municipio.nome;
+                        municipioSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.log('Erro ao carregar municípios:', error));
+        }
+
+        
+        document.getElementById('estado').addEventListener('change', function() {
+            let estadoId = this.value;
+            if (estadoId) {
+                carregarMunicipios(estadoId);
+            } else {
+                document.getElementById('municipio').innerHTML = '<option value="">Selecione um município</option>';
+                document.getElementById('estado-svg').innerHTML = ''; // Limpar SVG
+            }
+        });
+
+        // Evento ao selecionar um município
+        document.getElementById('municipio').addEventListener('change', function() {
+            let municipioId = this.value;
+            if (municipioId) {
+                // Aqui você pode destacar o município no SVG
+                // Exemplo: Adicionar uma classe 'highlight' ao município no SVG
+                let svg = document.getElementById('estado-svg');
+                let municipio = svg.querySelector(`#municipio-${municipioId}`);
+                if (municipio) {
+                    municipio.classList.add('highlight');
+                }
+            }
+        });
+
+        // Carregar os estados ao iniciar
+        carregarEstados();
+    </script>
+</body>
+</html>
