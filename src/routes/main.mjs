@@ -66,5 +66,29 @@ router.get('/api/municipios-svg/:nome', async (request, response) => {
     }
 });
 
+router.get('/api/estados-svg/:idEstado', async (request, response) => {
+    const { idEstado } = request.params;
+
+    try {
+        const [result] = await sequelize.query(
+            `SELECT ST_AsSVG(geom) AS svg FROM estados WHERE id = $1`,
+            {
+                bind: [idEstado],
+                type: sequelize.QueryTypes.SELECT,
+            }
+        );
+
+        if (result && result.svg) {
+            return response.send(result.svg);
+        } else {
+            return response.status(404).send({ error: "Estado não encontrado." });
+        }
+    } catch (error) {
+        console.error("Erro ao buscar SVG do estado:", error);
+        return response.status(500).send({ error: "Erro interno no servidor." });
+    }
+});
+
+
 
 export default router;
