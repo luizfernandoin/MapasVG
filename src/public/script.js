@@ -79,6 +79,7 @@ function createStatePath(svgPathData) {
 }
 
 async function carregarMapa(estadoNome, municipioNome = null) {
+    svgContainer.innerHTML = '';
     const endpoint = municipioNome
         ? `/api/municipios-svg/${municipioNome}`
         : `/api/estados-svg/${estadoNome}`;
