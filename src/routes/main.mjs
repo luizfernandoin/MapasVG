@@ -1,9 +1,8 @@
 import { Router } from "express";
-import sequelize from "../config/sequelize.mjs";
-
+import Geolocalizacao from "../services/geolocalizacao.mjs";
 
 const router = Router();
-
+const geoService = new Geolocalizacao();
 
 router.get('/api/estados', async (request, response) => {
     try {
@@ -11,6 +10,7 @@ router.get('/api/estados', async (request, response) => {
         const estados = await fetchResponse.json();
         response.json(estados);
     } catch (error) {
+        console.error("Erro ao carregar estados:", error);
         response.status(500).json({ message: 'Erro ao carregar estados', error });
     }
 });
@@ -21,7 +21,8 @@ router.get('/api/municipios', async (request, response) => {
         const municipios = await fetchResponse.json();
         response.json(municipios);
     } catch (error) {
-        response.status(500).json({ message: 'Erro ao carregar municipios', error });
+        console.error("Erro ao carregar municípios:", error);
+        response.status(500).json({ message: 'Erro ao carregar municípios', error });
     }
 });
 
@@ -33,62 +34,97 @@ router.get('/api/estados/:idEstado/municipios', async (request, response) => {
         const municipios = await fetchResponse.json();
         response.json(municipios);
     } catch (error) {
-        response.status(500).json({ message: 'Erro ao carregar municipios', error });
+        console.error(`Erro ao carregar municípios para o estado ${idEstado}:`, error);
+        response.status(500).json({ message: 'Erro ao carregar municípios', error });
     }
 });
 
+// Aqui você estava comentando a rota, então vou mantê-la como está por enquanto
+// router.get('/api/:estadoId/:municipioId', async (request, response) => { ...
 
-router.get('/api/municipios-svg/:nome', async (request, response) => {
-    const { nome } = request.params;
-    console.log("Nome recebido:", nome);
+// A rota abaixo deve vir antes da exportação do router
+// router.get('/api/estados-svg/:idEstado', async (request, response) => {
+//     let { idEstado } = request.params;
+//     idEstado = parseInt(idEstado, 10);
+
+//     try {
+//         const svgResult = await geoService.getSvgByEntityId(idEstado, "estado");
+
+//         if (!svgResult) {
+//             return response.status(404).json({ error: "Estado não encontrado." });
+//         }
+
+//         const viewBox = await geoService.getViewboxByEntityId(idEstado, "estado");
+
+//         if (!viewBox) {
+//             return response.status(404).json({ error: "ViewBox não encontrado para o estado." });
+//         }
+
+//         response.json({
+//             svg: svgResult,
+//             viewBox: viewBox
+//         });
+
+//     } catch (error) {
+//         console.error(`Erro ao buscar SVG do estado ${idEstado}:`, error);
+//         response.status(500).json({ error: "Erro interno no servidor." });
+//     }
+// });
+
+router.get('/api/estados-svg/:name', async (request, response) => {
+    let { name } = request.params;
+    console.log(request.url)
 
     try {
-        const [result] = await sequelize.query(
-            `SELECT ST_AsSVG(geom) AS svg FROM municipios WHERE nome ILIKE $1`,
-            {
-                bind: [nome],
-                type: sequelize.QueryTypes.SELECT,
-            }
-        );
+        const svgResult = await geoService.getSvgByEntityName(name, "estado");
 
-        console.log("Resultado da consulta:", result);
-
-        if (result && result.svg) {
-            response.type('image/svg+xml');
-            return response.send(result.svg);
-        } else {
-            console.log("Município não encontrado.");
-            return response.status(404).send({ error: "Município não encontrado." });
+        if (!svgResult) {
+            return response.status(404).json({ error: "Estado não encontrado." });
         }
+
+        const viewBox = await geoService.getViewboxByEntityName(name, "estado");
+
+        if (!viewBox) {
+            return response.status(404).json({ error: "ViewBox não encontrado para o estado." });
+        }
+
+        response.json({
+            svg: svgResult,
+            viewBox: viewBox
+        });
+
     } catch (error) {
-        console.error("Erro ao buscar SVG:", error);
-        return response.status(500).send({ error: "Erro interno no servidor." });
+        console.error(`Erro ao buscar SVG do estado ${name}:`, error);
+        response.status(500).json({ error: "Erro interno no servidor." });
     }
 });
 
-router.get('/api/estados-svg/:idEstado', async (request, response) => {
-    const { idEstado } = request.params;
+router.get('/api/municipios-svg/:name', async (request, response) => {
+    let { name } = request.params;
+    console.log(request.url)
 
     try {
-        const [result] = await sequelize.query(
-            `SELECT ST_AsSVG(geom) AS svg FROM estados WHERE id = $1`,
-            {
-                bind: [idEstado],
-                type: sequelize.QueryTypes.SELECT,
-            }
-        );
+        const svgResult = await geoService.getSvgByEntityName(name, "municipio");
 
-        if (result && result.svg) {
-            return response.send(result.svg);
-        } else {
-            return response.status(404).send({ error: "Estado não encontrado." });
+        if (!svgResult) {
+            return response.status(404).json({ error: "Municipio não encontrado." });
         }
+
+        const viewBox = await geoService.getViewboxByEntityName(name, "municipio");
+
+        if (!viewBox) {
+            return response.status(404).json({ error: "ViewBox não encontrado para o municipio." });
+        }
+
+        response.json({
+            svg: svgResult,
+            viewBox: viewBox
+        });
+
     } catch (error) {
-        console.error("Erro ao buscar SVG do estado:", error);
-        return response.status(500).send({ error: "Erro interno no servidor." });
+        console.error(`Erro ao buscar SVG do municipio ${name}:`, error);
+        response.status(500).json({ error: "Erro interno no servidor." });
     }
 });
-
-
 
 export default router;

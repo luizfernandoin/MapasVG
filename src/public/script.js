@@ -1,109 +1,128 @@
-const svgContainer = document.getElementById("estado-svg");
+const estadoSelect = document.getElementById('estado');
+const municipioSelect = document.getElementById('municipio');
+const svgContainer = document.getElementById('estado-svg');
 
-function carregarEstados() {
-    fetch('/api/estados')
-        .then(response => response.json())
-        .then(data => {
-            let estadoSelect = document.getElementById('estado');
-            estadoSelect.innerHTML = '<option value="">Selecione um estado</option>';
-            data.forEach(estado => {
-                let option = document.createElement('option');
-                option.value = estado.id;
-                option.textContent = estado.nome;
-                estadoSelect.appendChild(option);
-            });
-        })
-        .catch(error => console.log('Erro ao carregar estados:', error));
+function clearSelectOptions(selectElement, defaultOptionText) {
+    selectElement.innerHTML = `<option value="">${defaultOptionText}</option>`;
 }
 
-function carregarMunicipios(estadoId) {
-    fetch(`/api/estados/${estadoId}/municipios`)
-        .then(response => response.json())
-        .then(data => {
-            let municipioSelect = document.getElementById('municipio');
-            municipioSelect.innerHTML = '<option value="">Selecione um município</option>';
-            data.forEach(municipio => {
-                let option = document.createElement('option');
-                option.value = municipio.id;
-                option.textContent = municipio.nome;
-                municipioSelect.appendChild(option);
-            });
-        })
-        .catch(error => console.log('Erro ao carregar municípios:', error));
+function populateSelectOptions(selectElement, data, valueKey, textKey) {
+    data.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item[valueKey];
+        option.textContent = item[textKey];
+        selectElement.appendChild(option);
+    });
 }
 
-document.getElementById('estado').addEventListener('change', function () {
-    let estadoId = this.value;
-    if (estadoId) {
-        carregarMapa(estadoId);
-        carregarMunicipios(estadoId);
-    } else {
-        document.getElementById('municipio').innerHTML = '<option value="">Selecione um município</option>';
-        document.getElementById('estado-svg').innerHTML = '';
+async function fetchEstados() {
+    try {
+        const response = await fetch('/api/estados');
+        if (!response.ok) throw new Error('Erro ao carregar estados');
+        return await response.json();
+    } catch (error) {
+        console.error(error.message);
+        return [];
     }
-});
+}
 
-document.getElementById('municipio').addEventListener('change', function () {
-    let municipioNome = this.options[this.selectedIndex].textContent;
-    if (municipioNome) {
-        let estadoId = document.getElementById('estado').value;
-        carregarMapa(estadoId, municipioNome);
+async function fetchMunicipios(estadoId) {
+    try {
+        const response = await fetch(`/api/estados/${estadoId}/municipios`);
+        if (!response.ok) throw new Error('Erro ao carregar municípios');
+        return await response.json();
+    } catch (error) {
+        console.error(error.message);
+        return [];
     }
-});
+}
+
+async function fetchSvgPath(endpoint) {
+    console.log(endpoint);
+    try {
+        const response = await fetch(endpoint);
+        if (!response.ok) throw new Error('Erro ao carregar SVG');
+        
+        const data = await response.json();
+        console.log('Dados do SVG:', data);
+        
+        if (!data || !data.svg || !data.viewBox) {
+            throw new Error('Dados inválidos para o SVG ou viewBox');
+        }
+        
+        return data;
+    } catch (error) {
+        console.error(error.message);
+        return null;
+    }
+}
+
+async function carregarEstados() {
+    const estados = await fetchEstados();
+    clearSelectOptions(estadoSelect, 'Selecione um estado');
+    populateSelectOptions(estadoSelect, estados, 'id', 'nome');
+}
+
+async function carregarMunicipios(estadoId) {
+    const municipios = await fetchMunicipios(estadoId);
+    clearSelectOptions(municipioSelect, 'Selecione um município');
+    populateSelectOptions(municipioSelect, municipios, 'id', 'nome');
+}
 
 function createStatePath(svgPathData) {
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", svgPathData);
-    path.setAttribute("stroke", "black");
-    path.setAttribute("fill", "green");
-    path.setAttribute("stroke-width", "0.01");
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', svgPathData);
+    path.setAttribute('stroke', 'black');
+    path.setAttribute('fill', 'green');
+    path.setAttribute('stroke-width', '0.01');
     return path;
 }
 
-function carregarMapa(estadoId, municipioNome = null) {
-    const svgContainer = document.getElementById('estado-svg');
-    svgContainer.innerHTML = ''; // Limpa o conteúdo atual do SVG
+async function carregarMapa(estadoNome, municipioNome = null) {
+    const endpoint = municipioNome
+        ? `/api/municipios-svg/${municipioNome}`
+        : `/api/estados-svg/${estadoNome}`;
 
-    if (municipioNome) {
-        fetch(`/api/municipios-svg/${municipioNome}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Não foi possível carregar o SVG do município');
-                }
-                return response.text();
-            })
-            .then(svgPathData => {
-                const pathElement = createStatePath(svgPathData);
-                svgContainer.appendChild(pathElement);
-            })
-            .catch(error => {
-                console.error('Erro ao carregar mapa do município:', error);
-            });
+    const data = await fetchSvgPath(endpoint);
+    
+    if (data && data.svg && data.viewBox) {
+        const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgElement.innerHTML = data.svg;
+        svgElement.setAttribute('viewBox', data.viewBox);
+        const pathElement = createStatePath(data.svg);
+        svgElement.appendChild(pathElement);
+        svgContainer.appendChild(svgElement);
     } else {
-        fetch(`/api/estados-svg/${estadoId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Não foi possível carregar o SVG do estado');
-                }
-                return response.text();
-            })
-            .then(svgPathData => {
-                const pathElement = createStatePath(svgPathData);
-                svgContainer.appendChild(pathElement);
-            })
-            .catch(error => {
-                console.error('Erro ao carregar mapa do estado:', error);
-            });
+        console.error("Dados inválidos para o SVG ou viewBox");
     }
 }
 
-// function createSvgContainer() {
-//     const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-//     svgElement.setAttribute("viewBox", "-50 -50 100 100");
-//     svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-//     svgElement.style.width = "100%"; 
-//     svgElement.style.height = "auto";
-//     return svgElement;
-// }
+function setupEventListeners() {
+    estadoSelect.addEventListener('change', async function () {
+        const estadoId = this.value;
+        const estadoNome = this.options[this.selectedIndex].textContent;
+        if (estadoId) {
+            console.log(estadoId);
+            await carregarMunicipios(estadoId);
+            carregarMapa(estadoNome);
+        } else {
+            clearSelectOptions(municipioSelect, 'Selecione um município');
+            svgContainer.innerHTML = '';
+        }
+    });
 
-carregarEstados();
+    municipioSelect.addEventListener('change', function () {
+        const municipioNome = this.options[this.selectedIndex].textContent;
+        if (municipioNome) {
+            const estadoNome = estadoSelect.options[estadoSelect.selectedIndex].textContent;
+            carregarMapa(estadoNome, municipioNome);
+        }
+    });
+}
+
+function init() {
+    carregarEstados();
+    setupEventListeners();
+}
+
+init();
