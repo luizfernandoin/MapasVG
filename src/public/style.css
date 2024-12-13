@@ -62,8 +62,8 @@ select:focus {
 }
 
 #estado-svg {
-    width: 100%;
-    height: auto;
+    max-width: 50%;
+    max-height: 100%;
 }
 
 path {

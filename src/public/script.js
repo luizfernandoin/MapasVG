@@ -38,7 +38,6 @@ async function fetchMunicipios(estadoId) {
 }
 
 async function fetchSvgPath(endpoint) {
-    console.log(endpoint);
     try {
         const response = await fetch(endpoint);
         if (!response.ok) throw new Error('Erro ao carregar SVG');
@@ -69,32 +68,61 @@ async function carregarMunicipios(estadoId) {
     populateSelectOptions(municipioSelect, municipios, 'id', 'nome');
 }
 
-function createStatePath(svgPathData) {
+function createPath(svgPathData, id, fillColor) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', svgPathData);
+    path.setAttribute('id', id);
     path.setAttribute('stroke', 'black');
-    path.setAttribute('fill', 'green');
+    path.setAttribute('fill', fillColor);
     path.setAttribute('stroke-width', '0.01');
     return path;
 }
 
+
+let estadoViewBox = null;
 async function carregarMapa(estadoNome, municipioNome = null) {
-    svgContainer.innerHTML = '';
     const endpoint = municipioNome
         ? `/api/municipios-svg/${municipioNome}`
         : `/api/estados-svg/${estadoNome}`;
 
     const data = await fetchSvgPath(endpoint);
-    
+
     if (data && data.svg && data.viewBox) {
-        const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svgElement.innerHTML = data.svg;
-        svgElement.setAttribute('viewBox', data.viewBox);
-        const pathElement = createStatePath(data.svg);
-        svgElement.appendChild(pathElement);
-        svgContainer.appendChild(svgElement);
+        if (!municipioNome && data.viewBox) {
+            estadoViewBox = data.viewBox;
+            svgContainer.setAttribute('viewBox', estadoViewBox);
+        } else if (!estadoViewBox) {
+            console.error('Erro: viewBox do estado não definido');
+            return;
+        }
+
+        let stateGroup = svgContainer.querySelector('#state-group');
+        let municipalityGroup = svgContainer.querySelector('#municipality-group');
+
+        if (!stateGroup) {
+            stateGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            stateGroup.setAttribute('id', 'state-group');
+            svgContainer.appendChild(stateGroup);
+        }
+
+        if (!municipalityGroup) {
+            municipalityGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            municipalityGroup.setAttribute('id', 'municipality-group');
+            svgContainer.appendChild(municipalityGroup);
+        }
+
+        if (!municipioNome) {
+            stateGroup.innerHTML = '';
+            const statePath = createPath(data.svg, 'state-path', 'green');
+            stateGroup.appendChild(statePath);
+            municipalityGroup.innerHTML = '';
+        } else {
+            municipalityGroup.innerHTML = '';
+            const municipalityPath = createPath(data.svg, 'municipality-path', 'red');
+            municipalityGroup.appendChild(municipalityPath);
+        }
     } else {
-        console.error("Dados inválidos para o SVG ou viewBox");
+        console.error('Dados inválidos para o SVG ou viewBox');
     }
 }
 
@@ -103,12 +131,12 @@ function setupEventListeners() {
         const estadoId = this.value;
         const estadoNome = this.options[this.selectedIndex].textContent;
         if (estadoId) {
-            console.log(estadoId);
             await carregarMunicipios(estadoId);
             carregarMapa(estadoNome);
         } else {
             clearSelectOptions(municipioSelect, 'Selecione um município');
             svgContainer.innerHTML = '';
+            estadoViewBox = null;
         }
     });
 
